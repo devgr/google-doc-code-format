@@ -1,5 +1,5 @@
 // In Google Docs, go to the Tools menu > Script Editor, and paste in this code.
-// Author: George Darling
+// Author: George Darling - Decision Source Inc.
 // License: MIT
 
 function onOpen(){
@@ -7,6 +7,7 @@ function onOpen(){
   ui.createMenu('Format Code')
   .addItem('Format selection as code', 'setStyleCode')
   .addItem('Format `...` as code', 'replaceMarkdown')
+  .addItem('Format ``` code blocks', 'replaceBlockCode')
   .addToUi();
 }
 
@@ -66,4 +67,39 @@ function formatElement(textElement, optStart, optEnd) {
     text.setFontSize(10);
     text.setBackgroundColor('#efefef');
   }
+}
+
+function replaceBlockCode() {
+  var body = DocumentApp.getActiveDocument().getBody();
+  var allText = body.editAsText();
+  var giantStr = allText.getText();
+  var findExp = /```\n([\s\S]*?)\n```/gm; // match everything between ``` and ```
+  var result = null;
+  var matches = 0;
+  while(result = findExp.exec(giantStr)) {
+    // grab the block of code as a normal string
+    var codeStr = result[1]; // just the code, not the ```
+    codeStr = codeStr.replace(/\n/g, '\r'); // in Google Docs, \n is a new paragraph, \r is a new line
+    // remove that block from the document
+    var indexCorrection = matches * 8; // for the ```\n\n``` that was removed
+    allText.deleteText(result.index - indexCorrection, findExp.lastIndex - 1 - indexCorrection);
+    // add it in as a single paragraph
+    allText.insertText(result.index - indexCorrection, codeStr);
+    
+    // find the paragraph that was just added. kind of messy, though I can't find a better way.
+    var rangeElem = null;
+    while (rangeElem = body.findElement(DocumentApp.ElementType.PARAGRAPH, rangeElem)) {
+      if(rangeElem.getElement().getText() === codeStr) {
+        rangeElem.getElement().setLineSpacing(1); // change to single spacing rather than 1.15
+        break;
+      }
+    }
+    // then format it
+    formatElement(allText, result.index - indexCorrection, result.index + codeStr.length - 1 - indexCorrection);
+    matches++;
+  }
+}
+
+function clearLogs() {
+  Logger.clear();
 }
